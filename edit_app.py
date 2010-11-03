@@ -48,7 +48,7 @@ class EditActivity(sugar_tools.GroupActivity):
 
         self.scrollwindow.add(self.text_view)
 
-        sugar_tools.GroupActivity.__init__(self, handle)
+        sugar_tools.GroupActivity.__init__(self, handl)
         
     def fix_mimetype(self):
         '''We must have a mimetype. Sometimes, we don't (when we get launched
