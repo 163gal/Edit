@@ -35,7 +35,7 @@ class EditActivity(sugar_tools.GroupActivity):
         etime = self.metadata[mdnames.cloudtimestamp_md]
         return mtime > etime
 
-    def __init__(self):
+    def __init__(self, handle):
         '''We want to set up the buffer et al. early on
         sure there's early_setup, but that's not early enough
         '''
@@ -48,7 +48,7 @@ class EditActivity(sugar_tools.GroupActivity):
 
         self.scrollwindow.add(self.text_view)
 
-        sugar_tools.GroupActivity.__init__(self)
+        sugar_tools.GroupActivity.__init__(self, handle)
         
     def fix_mimetype(self):
         '''We must have a mimetype. Sometimes, we don't (when we get launched
