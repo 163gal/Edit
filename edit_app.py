@@ -40,7 +40,6 @@ class EditActivity(sugar_tools.GroupActivity):
         sure there's early_setup, but that's not early enough
         '''
         
-        self._logger = logging.getLogger("edit-activity")
         self.buffer = gtksourceview.Buffer()
         self.refresh_buffer = False
         
