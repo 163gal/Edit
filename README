@@ -1,0 +1,4 @@
+Use "python setup.py install" to install in Sugar
+Use "python setup.py dev" to use symlinks (for easier hacking)
+
+Everything should be fairly intuitive: if it's not, fix it 'till it is.
