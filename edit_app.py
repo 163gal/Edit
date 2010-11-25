@@ -56,8 +56,8 @@ class ActivityToolbarButton(ToolbarButton):
 
 class EditActivity(sugar_tools.GroupActivity):
     '''A text editor for Sugar
-    pylint says I need a docstring. Here you go.
-    '''
+pylint says I need a docstring. Here you go.
+'''
 
     message_preparing = _("Loading...")
     message_joining = _("Joining shared activity...")
@@ -66,9 +66,9 @@ class EditActivity(sugar_tools.GroupActivity):
 
     def checkts(self):
         '''Check the timestamp
-        If someone's modified our file in an external editor,
-        we should reload the contents
-        '''
+If someone's modified our file in an external editor,
+we should reload the contents
+'''
 
         mtime = self.metadata[mdnames.sugartimestamp_md]
         etime = self.metadata[mdnames.cloudtimestamp_md]
@@ -76,8 +76,8 @@ class EditActivity(sugar_tools.GroupActivity):
 
     def __init__(self, handle):
         '''We want to set up the buffer et al. early on
-        sure there's early_setup, but that's not early enough
-        '''
+sure there's early_setup, but that's not early enough
+'''
         
         self.buffer = gtksourceview.Buffer()
         self.refresh_buffer = False
@@ -91,7 +91,7 @@ class EditActivity(sugar_tools.GroupActivity):
         
     def fix_mimetype(self):
         '''We must have a mimetype. Sometimes, we don't (when we get launched
-        newly.) This  fixes that.'''
+newly.) This fixes that.'''
         if self.metadata[mdnames.mimetype_md] == '':
             self.metadata[mdnames.mimetype_md] = "text/plain"
             #we MUST have a mimetype
@@ -111,6 +111,11 @@ class EditActivity(sugar_tools.GroupActivity):
         self.edit_toolbar.show()
         toolbar_box.toolbar.insert(edit_toolbar_button, -1)
         edit_toolbar_button.show()
+
+        self.edit_toolbar.undo.connect('clicked', self.undobutton_cb)
+        self.edit_toolbar.redo.connect('clicked', self.redobutton_cb)
+        self.edit_toolbar.copy.connect('clicked', self.copybutton_cb)
+        self.edit_toolbar.paste.connect('clicked', self.pastebutton_cb)
 
         separator = gtk.SeparatorToolItem()
         separator.props.draw = False
@@ -144,7 +149,7 @@ class EditActivity(sugar_tools.GroupActivity):
             lang_ids = lang_manager.get_language_ids()
             langs = [lang_manager.get_language(lang_id) for lang_id in lang_ids]
             for lang in langs:
-                for mtype in lang.get_mime_types():  
+                for mtype in lang.get_mime_types():
                     if mtype == self.metadata[mdnames.mimetype_md]:
                         self.buffer.set_language(lang)
                         break
@@ -156,7 +161,7 @@ class EditActivity(sugar_tools.GroupActivity):
         if self.metadata[mdnames.mimetype_md] == "text/plain":
             self.text_view.set_show_line_numbers(False)
             self.text_view.set_wrap_mode(gtk.WRAP_WORD)
-            font = pango.FontDescription("Bitstream Vera Sans " + 
+            font = pango.FontDescription("Bitstream Vera Sans " +
                 str(style.FONT_SIZE))
         else:
             if hasattr(self.buffer,'set_highlight'):
@@ -170,14 +175,16 @@ class EditActivity(sugar_tools.GroupActivity):
             self.text_view.set_insert_spaces_instead_of_tabs(True)
             self.text_view.set_tab_width(2)
             self.text_view.set_auto_indent(True)
-            font = pango.FontDescription("Monospace " + 
+            font = pango.FontDescription("Monospace " +
                 str(style.FONT_SIZE))
 
         self.text_view.modify_font(font)
 
         if self.refresh_buffer:
             #see load_from_journal()
+            self.buffer.begin_not_undoable_action()
             self.buffer.set_text(self.refresh_buffer)
+            self.buffer.end_not_undoable_action()
         
         self.text_view.show()
 
@@ -186,7 +193,7 @@ class EditActivity(sugar_tools.GroupActivity):
 
     def save_to_journal(self, filename, cloudstring):
         '''Saves to the journal.
-        We use metadata magic to keep the collab. stuff'''
+We use metadata magic to keep the collab. stuff'''
         self.metadata[mdnames.cloudstring_md] = cloudstring
 
         #Also write to file:
@@ -231,4 +238,21 @@ class EditActivity(sugar_tools.GroupActivity):
             self.buffer.set_text(text)
             return None
 
+    def when_shared(self):
+        self._edit_toolbar.undo.set_sensitive(False)
+        self._edit_toolbar.redo.set_sensitive(False)
 
+    def undobutton_cb(self, button):
+        if self.buffer.can_undo():
+            self.buffer.undo()
+
+    def redobutton_cb(self, button):
+        global text_buffer
+        if self.buffer.can_redo():
+            self.buffer.redo()
+
+    def copybutton_cb(self, button):
+        self.buffer.copy_clipboard(gtk.Clipboard())
+
+    def pastebutton_cb(self, button):
+        self.buffer.paste_clipboard(gtk.Clipboard(), None, True)
