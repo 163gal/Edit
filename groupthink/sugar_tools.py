@@ -17,7 +17,9 @@
 import logging
 import telepathy
 
-from sugar.activity.activity import Activity, ActivityToolbox
+from sugar.activity.activity import Activity
+from sugar.graphics.toolbarbox import ToolbarBox
+
 from sugar.presence import presenceservice
 
 from sugar.presence.tubeconn import TubeConnection
@@ -59,7 +61,6 @@ class GroupActivity(Activity):
         self._handle = handle
         
         ##gobject.threads_init()
-                
         self._sharing_completed = not self._shared_activity
         self._readfile_completed = not handle.object_id
         if self._shared_activity:
@@ -70,7 +71,7 @@ class GroupActivity(Activity):
             self.message = self.message_preparing
 
         # top toolbar with share and close buttons:
-        toolbox = ActivityToolbox(self)
+        toolbox = ToolbarBox(self)
         self.set_toolbox(toolbox)
         toolbox.show()
         
@@ -96,7 +97,8 @@ class GroupActivity(Activity):
         # that contains all state in the system.  Everything else is stateless.
         # self.cloud has to be defined before the call to self.set_canvas, because
         # set_canvas can trigger almost anything, including pending calls to read_file,
-        # which relies on self.cloud.
+        # which relies on self.cloud.        self._initialize_display()
+
         
         # get the Presence Service
         self.pservice = presenceservice.get_instance()
@@ -117,6 +119,7 @@ class GroupActivity(Activity):
         self.connect("notify::active", self._active_cb)
         
         if not self._readfile_completed:
+            self._initialize_display()
             self.read_file(self._jobject.file_path)
         elif not self._shared_activity:
             gobject.idle_add(self._initialize_cleanstart)

@@ -8,12 +8,51 @@ from groupthink import sugar_tools, gtk_tools
 from gettext import gettext as _
 
 import gtk, pango
-import time, logging
+import time
 import gtksourceview2 as gtksourceview
 
 from sugar.graphics import style
+from sugar.activity.activity import EditToolbar
+from sugar.activity.widgets import ActivityToolbar
+from sugar.graphics.toolbarbox import ToolbarBox
+from sugar.graphics.toolbarbox import ToolbarButton
+from sugar.activity.widgets import StopButton
 
 import mdnames
+
+from sugar.graphics.xocolor import XoColor
+from sugar.graphics.icon import Icon
+from sugar.bundle.activitybundle import ActivityBundle
+
+def _create_activity_icon(metadata):
+    '''Get the icon given an activity'''
+    if metadata.get('icon-color', ''):
+        color = XoColor(metadata['icon-color'])
+    else:
+        client = gconf.client_get_default()
+        color = XoColor(client.get_string(
+            '/desktop/sugar/user/color'))
+
+    from sugar.activity.activity import get_bundle_path
+    bundle = ActivityBundle(get_bundle_path())
+    icon = Icon(file=bundle.get_icon(), xo_color=color)
+
+    return icon
+
+class ActivityToolbarButton(ToolbarButton):
+    #thanks, sugar activity guide
+    def __init__(self, activity, **kwargs):
+        toolbar = ActivityToolbar(activity,
+            orientation_left=True)
+        toolbar.stop.hide()
+        toolbar.keep.hide()
+
+        ToolbarButton.__init__(self, page=toolbar,
+            **kwargs)
+
+        icon = _create_activity_icon(activity.metadata)
+        self.set_icon_widget(icon)
+        icon.show()
 
 class EditActivity(sugar_tools.GroupActivity):
     '''A text editor for Sugar
@@ -48,7 +87,7 @@ class EditActivity(sugar_tools.GroupActivity):
 
         self.scrollwindow.add(self.text_view)
 
-        sugar_tools.GroupActivity.__init__(self, handl)
+        sugar_tools.GroupActivity.__init__(self, handle)
         
     def fix_mimetype(self):
         '''We must have a mimetype. Sometimes, we don't (when we get launched
@@ -56,14 +95,48 @@ class EditActivity(sugar_tools.GroupActivity):
         if self.metadata[mdnames.mimetype_md] == '':
             self.metadata[mdnames.mimetype_md] = "text/plain"
             #we MUST have a mimetype
+            
+    def setup_toolbar(self):
+        '''Setup the top toolbar. Groupthink needs some work here.'''
+        toolbar_box = ToolbarBox()
+        
+        activity_button = ActivityToolbarButton(self)
+        toolbar_box.toolbar.insert(activity_button, 0)
+        activity_button.show()
+        
+        self.edit_toolbar = EditToolbar()
+        edit_toolbar_button = ToolbarButton(
+            page=self.edit_toolbar,
+            icon_name='toolbar-edit')
+        self.edit_toolbar.show()
+        toolbar_box.toolbar.insert(edit_toolbar_button, -1)
+        edit_toolbar_button.show()
 
+        separator = gtk.SeparatorToolItem()
+        separator.props.draw = False
+        separator.set_expand(True)
+        toolbar_box.toolbar.insert(separator, -1)
+        separator.show()
+
+        
+        stop_button = StopButton(self)
+        stop_button.props.accelerator = '<Ctrl><Shift>Q'
+        toolbar_box.toolbar.insert(stop_button, -1)
+        stop_button.show()
+
+        self.set_toolbar_box(toolbar_box)
+        toolbar_box.show()
+        
     def initialize_display(self):
         '''Set up GTK and friends'''
         self.fix_mimetype()
 
         self.cloud.shared_buffer = gtk_tools.TextBufferSharePoint(self.buffer)
 
-        #Borrowed from Pippy
+        self.setup_toolbar()
+        #Some graphics code borrowed from Pippy
+
+
         lang_manager = gtksourceview.language_manager_get_default()
         if hasattr(lang_manager, 'list_languages'):
             langs = lang_manager.list_languages()
@@ -74,8 +147,7 @@ class EditActivity(sugar_tools.GroupActivity):
                 for mtype in lang.get_mime_types():  
                     if mtype == self.metadata[mdnames.mimetype_md]:
                         self.buffer.set_language(lang)
-
-
+                        break
         
 
         self.text_view.set_editable(True)
