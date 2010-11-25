@@ -112,11 +112,6 @@ class EditActivity(sugar_tools.GroupActivity):
         toolbar_box.toolbar.insert(edit_toolbar_button, -1)
         edit_toolbar_button.show()
 
-        self.edit_toolbar.undo.connect('clicked', self.undobutton_cb)
-        self.edit_toolbar.redo.connect('clicked', self.redobutton_cb)
-        self.edit_toolbar.copy.connect('clicked', self.copybutton_cb)
-        self.edit_toolbar.paste.connect('clicked', self.pastebutton_cb)
-
         separator = gtk.SeparatorToolItem()
         separator.props.draw = False
         separator.set_expand(True)
@@ -182,9 +177,7 @@ class EditActivity(sugar_tools.GroupActivity):
 
         if self.refresh_buffer:
             #see load_from_journal()
-            self.buffer.begin_not_undoable_action()
             self.buffer.set_text(self.refresh_buffer)
-            self.buffer.end_not_undoable_action()
         
         self.text_view.show()
 
@@ -238,21 +231,4 @@ class EditActivity(sugar_tools.GroupActivity):
             self.buffer.set_text(text)
             return None
 
-    def when_shared(self):
-        self._edit_toolbar.undo.set_sensitive(False)
-        self._edit_toolbar.redo.set_sensitive(False)
 
-    def undobutton_cb(self, button):
-        if self.buffer.can_undo():
-            self.buffer.undo()
-
-    def redobutton_cb(self, button):
-        global text_buffer
-        if self.buffer.can_redo():
-            self.buffer.redo()
-
-    def copybutton_cb(self, button):
-        self.buffer.copy_clipboard(gtk.Clipboard())
-
-    def pastebutton_cb(self, button):
-        self.buffer.paste_clipboard(gtk.Clipboard(), None, True)
