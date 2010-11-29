@@ -9,7 +9,10 @@ from gettext import gettext as _
 
 import gtk, pango
 import time
+import pickle
 import gtksourceview2 as gtksourceview
+
+from sugar.activity.activity import get_bundle_path
 
 from sugar.graphics import style
 from sugar.activity.activity import EditToolbar
@@ -33,7 +36,6 @@ def _create_activity_icon(metadata):
         color = XoColor(client.get_string(
             '/desktop/sugar/user/color'))
 
-    from sugar.activity.activity import get_bundle_path
     bundle = ActivityBundle(get_bundle_path())
     icon = Icon(file=bundle.get_icon(), xo_color=color)
 
@@ -64,7 +66,7 @@ pylint says I need a docstring. Here you go.
     message_loading = _("Reading journal entry...")
 
 
-    def checkts(self):
+    def _checkts(self):
         '''Check the timestamp
 If someone's modified our file in an external editor,
 we should reload the contents
@@ -88,15 +90,17 @@ sure there's early_setup, but that's not early enough
         self.scrollwindow.add(self.text_view)
 
         sugar_tools.GroupActivity.__init__(self, handle)
+
         
-    def fix_mimetype(self):
+        
+    def _fix_mimetype(self):
         '''We must have a mimetype. Sometimes, we don't (when we get launched
 newly.) This fixes that.'''
         if self.metadata[mdnames.mimetype_md] == '':
             self.metadata[mdnames.mimetype_md] = "text/plain"
             #we MUST have a mimetype
             
-    def setup_toolbar(self):
+    def _setup_toolbar(self):
         '''Setup the top toolbar. Groupthink needs some work here.'''
         toolbar_box = ToolbarBox()
         
@@ -134,11 +138,11 @@ newly.) This fixes that.'''
         
     def initialize_display(self):
         '''Set up GTK and friends'''
-        self.fix_mimetype()
+        self._fix_mimetype()
 
         self.cloud.shared_buffer = gtk_tools.TextBufferSharePoint(self.buffer)
 
-        self.setup_toolbar()
+        self._setup_toolbar()
         #Some graphics code borrowed from Pippy
 
 
@@ -205,7 +209,7 @@ We use metadata magic to keep the collab. stuff'''
         fhandle.write(text)
         fhandle.close()
 
-        self.fix_mimetype()
+        self._fix_mimetype()
 
         #We can do full-text search on all Edit documents, yay
         self.metadata[mdnames.contents_md] = text
@@ -220,7 +224,7 @@ We use metadata magic to keep the collab. stuff'''
 
 
         if mdnames.cloudstring_md in self.metadata:
-            if self.checkts():
+            if self._checkts():
                 #if we were edited in another program
                 #we need to reload the text
                 #setting self.refresh_buffer makes us do that
@@ -242,17 +246,17 @@ We use metadata magic to keep the collab. stuff'''
         self._edit_toolbar.undo.set_sensitive(False)
         self._edit_toolbar.redo.set_sensitive(False)
 
-    def undobutton_cb(self, button):
+    def _undobutton_cb(self, button):
         if self.buffer.can_undo():
             self.buffer.undo()
 
-    def redobutton_cb(self, button):
+    def _redobutton_cb(self, button):
         global text_buffer
         if self.buffer.can_redo():
             self.buffer.redo()
 
-    def copybutton_cb(self, button):
+    def _copybutton_cb(self, button):
         self.buffer.copy_clipboard(gtk.Clipboard())
 
-    def pastebutton_cb(self, button):
+    def _pastebutton_cb(self, button):
         self.buffer.paste_clipboard(gtk.Clipboard(), None, True)
