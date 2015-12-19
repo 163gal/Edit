@@ -17,22 +17,24 @@
 import logging
 import telepathy
 
-from sugar.activity.activity import Activity
-from sugar.graphics.toolbarbox import ToolbarBox
+from sugar3.activity.activity import Activity
+from sugar3.presence import presenceservice
 
-from sugar.presence import presenceservice
+from sugar3.presence.tubeconn import TubeConnection
+from sugar3.graphics.window import Window
 
-from sugar.presence.tubeconn import TubeConnection
-from sugar.graphics.window import Window
-
-import gtk
-import gobject
+from gi.repository import Gtk
+from gi.repository import Gdk
+from gi.repository import GObject
 
 import groupthink_base as groupthink
 
+from sugar3.graphics.toolbarbox import ToolbarBox
+from sugar3.activity.widgets import ActivityToolbarButton
+
 def exhaust_event_loop():
-    while gtk.events_pending():
-        gtk.main_iteration()
+    while Gtk.events_pending():
+        Gtk.main_iteration()
 
 class GroupActivity(Activity):
 
@@ -44,7 +46,7 @@ class GroupActivity(Activity):
     def __init__(self, handle):
         # self.initiating indicates whether this instance has initiated sharing
         # it always starts false, but will be set to true if this activity
-        # initiates sharing. In particular, if Activity.__init__ calls 
+        # initiates sharing. In particular, if Activity.__init__ calls
         # self.share(), self.initiating will be set to True.
         self.initiating = False
         # self._processed_share indicates whether when_shared() has been called
@@ -59,25 +61,27 @@ class GroupActivity(Activity):
         self.logger = logging.getLogger(self.dbus_name)
         
         self._handle = handle
-        
-        ##gobject.threads_init()
-        self._sharing_completed = not self._shared_activity
+
+        ##GObject.threads_init()
+
+        self._sharing_completed = not self.shared_activity
         self._readfile_completed = not handle.object_id
-        if self._shared_activity:
+
+        if self.shared_activity:
             self.message = self.message_joining
         elif handle.object_id:
             self.message = self.message_loading
         else:
             self.message = self.message_preparing
 
-        # top toolbar with share and close buttons:
-        toolbox = ToolbarBox(self)
-        self.set_toolbox(toolbox)
-        toolbox.show()
-        
-        v = gtk.VBox()
-        self.startup_label = gtk.Label(self.message)
-        v.pack_start(self.startup_label)
+        toolbar_box = ToolbarBox()
+        self.activity_button = ActivityToolbarButton(self)
+        toolbar_box.toolbar.insert(self.activity_button, 0)
+        self.set_toolbar_box(toolbar_box)
+
+        v = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.startup_label = Gtk.Label(label=self.message)
+        v.pack_start(self.startup_label, True, True, 0)
         Window.set_canvas(self,v)
         self.show_all()
         
@@ -97,8 +101,7 @@ class GroupActivity(Activity):
         # that contains all state in the system.  Everything else is stateless.
         # self.cloud has to be defined before the call to self.set_canvas, because
         # set_canvas can trigger almost anything, including pending calls to read_file,
-        # which relies on self.cloud.        self._initialize_display()
-
+        # which relies on self.cloud.
         
         # get the Presence Service
         self.pservice = presenceservice.get_instance()
@@ -114,15 +117,14 @@ class GroupActivity(Activity):
             else:
                 self._joined_cb(self)
         
-        self.add_events(gtk.gdk.VISIBILITY_NOTIFY_MASK)
+        self.add_events(Gdk.EventMask.VISIBILITY_NOTIFY_MASK)
         self.connect("visibility-notify-event", self._visible_cb)
         self.connect("notify::active", self._active_cb)
         
         if not self._readfile_completed:
-            self._initialize_display()
             self.read_file(self._jobject.file_path)
-        elif not self._shared_activity:
-            gobject.idle_add(self._initialize_cleanstart)
+        elif not self.shared_activity:
+            GObject.idle_add(self._initialize_cleanstart)
     
     def _initialize_cleanstart(self):
         self.initialize_cleanstart()
@@ -144,12 +146,18 @@ class GroupActivity(Activity):
         main_widget = self.initialize_display()
         Window.set_canvas(self, main_widget)
         self.initialized = True
-        if self._shared_activity and not self._processed_share:
+
+        if self.shared_activity and not self._processed_share:
             # We are joining a shared activity, but when_shared has not yet
             # been called
             self.when_shared()
             self._processed_share = True
         self.show_all()
+        self.after_init()
+
+    def after_init(self):
+        """Callback after init. Override to use"""
+        pass
     
     def initialize_display(self):
         """All subclasses must override this method, in order to display
@@ -182,13 +190,13 @@ class GroupActivity(Activity):
             self.dbus_name, {})
 
     def _sharing_setup(self):
-        if self._shared_activity is None:
+        if self.shared_activity is None:
             self.logger.error('Failed to share or join activity')
             return
 
-        self.conn = self._shared_activity.telepathy_conn
-        self.tubes_chan = self._shared_activity.telepathy_tubes_chan
-        self.text_chan = self._shared_activity.telepathy_text_chan
+        self.conn = self.shared_activity.telepathy_conn
+        self.tubes_chan = self.shared_activity.telepathy_tubes_chan
+        self.text_chan = self.shared_activity.telepathy_text_chan
 
         self.tubes_chan[telepathy.CHANNEL_TYPE_TUBES].connect_to_signal('NewTube',
             self._new_tube_cb)
@@ -202,7 +210,7 @@ class GroupActivity(Activity):
         self.logger.error('ListTubes() failed: %s', e)
 
     def _joined_cb(self, activity):
-        if not self._shared_activity:
+        if not self.shared_activity:
             return
 
         self.logger.debug('Joined an existing shared activity')
@@ -235,13 +243,12 @@ class GroupActivity(Activity):
         self._readfile_completed = True
         if self._sharing_completed and not self.initialized:
             self._initialize_display()
-        pass
         
     def load_from_journal(self, file_path):
         """This implementation of load_from_journal simply returns the contents
         of the file.  Any inheritor overriding this method must return the
         string provided to save_to_journal as cloudstring."""
-	if file_path:
+        if file_path:
             f = file(file_path,'rb')
             s = f.read()
             f.close()
@@ -255,12 +262,12 @@ class GroupActivity(Activity):
         # read) before writing.
         if not self._readfile_completed:
             self.read_file(self._jobject.file_path)
-        self.save_to_journal(file_path, self.cloud.dumps())            
+        self.save_to_journal(file_path, self.cloud.dumps())
 
     def save_to_journal(self, file_path, cloudstring):
-        """This implementation of save_to_journal simply dumps the output of 
+        """This implementation of save_to_journal simply dumps the output of
         self.cloud.dumps() to disk.  Any inheritor who wishes to control file
-        output should override this method, and must 
+        output should override this method, and must
         be sure to include cloudstring in its write_file."""
         f = file(file_path, 'wb')
         f.write(cloudstring)
@@ -275,7 +282,7 @@ class GroupActivity(Activity):
             
     def _visible_cb(self, widget, event):
         self.logger.debug("_visible_cb")
-        if event.state == gtk.gdk.VISIBILITY_FULLY_OBSCURED:
+        if event.get_state() == Gdk.VisibilityState.FULLY_OBSCURED:
             self.pause()
         else:
             self.resume()
