@@ -3,31 +3,25 @@ Written mostly by Nate Theis
 Some GTK code borrowed from Pippy
 '''
 
-from groupthink import sugar_tools, gtk_tools
-
 from gettext import gettext as _
 
-import gtk
-import pango
+from gi.repository import Gtk
+from gi.repository import Pango
 import time
-import gtksourceview2 as gtksourceview
+from gi.repository import GtkSource
 
-from sugar.activity import activity
+from sugar3.activity import activity
 
-try:  # Can use 'New' toolbar design?
-    from sugar.graphics.toolbarbox import ToolbarBox
-    _HAVE_TOOLBOX = True
-except ImportError:
-    _HAVE_TOOLBOX = False
+from sugar3.graphics.toolbarbox import ToolbarBox
+from sugar3.activity.widgets import ActivityToolbarButton, StopButton
+from sugar3.graphics.toolbarbox import ToolbarButton
 
-if _HAVE_TOOLBOX:
-    from sugar.activity.widgets import ActivityToolbarButton, StopButton
-    from sugar.graphics.toolbarbox import ToolbarButton
-
-from sugar.graphics import style
-from sugar.activity.activity import EditToolbar
+from sugar3.graphics import style
+from sugar3.activity.widgets import EditToolbar
 
 import mdnames
+
+from groupthink import sugar_tools, gtk_tools
 
 
 class EditActivity(sugar_tools.GroupActivity):
@@ -54,11 +48,11 @@ class EditActivity(sugar_tools.GroupActivity):
         sure there's early_setup, but that's not early enough
         '''
 
-        self.buffer = gtksourceview.Buffer()
+        self.buffer = GtkSource.Buffer()
         self.refresh_buffer = False
 
-        self.text_view = gtksourceview.View(self.buffer)
-        self.scrollwindow = gtk.ScrolledWindow()
+        self.text_view = GtkSource.View.new_with_buffer(self.buffer)
+        self.scrollwindow = Gtk.ScrolledWindow()
 
         self.scrollwindow.add(self.text_view)
 
@@ -74,50 +68,39 @@ class EditActivity(sugar_tools.GroupActivity):
     def setup_toolbar(self):
         '''Setup the top toolbar. Groupthink needs some work here.'''
 
-        if _HAVE_TOOLBOX:  # 'New' Sugar toolbar design
-            toolbox = ToolbarBox()
+        toolbox = ToolbarBox()
 
-            activity_button = ActivityToolbarButton(self)
-            toolbox.toolbar.insert(activity_button, 0)
-            activity_button.show()
+        activity_button = ActivityToolbarButton(self)
+        toolbox.toolbar.insert(activity_button, 0)
+        activity_button.show()
 
-            self.set_toolbar_box(toolbox)
-            toolbox.show()
-            toolbar = toolbox.toolbar
+        self.set_toolbar_box(toolbox)
+        toolbox.show()
+        toolbar = toolbox.toolbar
 
-            self.edit_toolbar = EditToolbar()
-            edit_toolbar_button = ToolbarButton(
-                page=self.edit_toolbar,
-                icon_name='toolbar-edit')
-            self.edit_toolbar.show()
-            toolbar.insert(edit_toolbar_button, -1)
-            edit_toolbar_button.show()
-
-        else:  # 'Old' Sugar toolbar design
-            self.edit_toolbar = EditToolbar()
-            toolbox = activity.ActivityToolbox(self)
-            self.set_toolbox(toolbox)
-            toolbox.add_toolbar(_('Edit'), self.edit_toolbar)
-            toolbox.show()
-            toolbox.set_current_toolbar(1)
-            toolbar = self.edit_toolbar
+        self.edit_toolbar = EditToolbar()
+        edit_toolbar_button = ToolbarButton(
+            page=self.edit_toolbar,
+            icon_name='toolbar-edit')
+        self.edit_toolbar.show()
+        toolbar.insert(edit_toolbar_button, -1)
+        edit_toolbar_button.show()
 
         self.edit_toolbar.undo.connect('clicked', self.undobutton_cb)
         self.edit_toolbar.redo.connect('clicked', self.redobutton_cb)
         self.edit_toolbar.copy.connect('clicked', self.copybutton_cb)
         self.edit_toolbar.paste.connect('clicked', self.pastebutton_cb)
 
-        if _HAVE_TOOLBOX:
-            separator = gtk.SeparatorToolItem()
-            separator.props.draw = False
-            separator.set_expand(True)
-            toolbar.insert(separator, -1)
-            separator.show()
+        separator = Gtk.SeparatorToolItem()
+        separator.props.draw = False
+        separator.set_expand(True)
+        toolbar.insert(separator, -1)
+        separator.show()
 
-            stop_button = StopButton(self)
-            stop_button.props.accelerator = '<Ctrl>q'
-            toolbox.toolbar.insert(stop_button, -1)
-            stop_button.show()
+        stop_button = StopButton(self)
+        stop_button.props.accelerator = '<Ctrl>q'
+        toolbox.toolbar.insert(stop_button, -1)
+        stop_button.show()
 
     def initialize_display(self):
         '''Set up GTK and friends'''
@@ -128,7 +111,7 @@ class EditActivity(sugar_tools.GroupActivity):
         self.setup_toolbar()
         #Some graphics code borrowed from Pippy
 
-        lang_manager = gtksourceview.language_manager_get_default()
+        lang_manager = GtkSource.LanguageManager.get_default()
         if hasattr(lang_manager, 'list_languages'):
             langs = lang_manager.list_languages()
         else:
@@ -146,8 +129,8 @@ class EditActivity(sugar_tools.GroupActivity):
 
         if self.metadata[mdnames.mimetype_md] == "text/plain":
             self.text_view.set_show_line_numbers(False)
-            self.text_view.set_wrap_mode(gtk.WRAP_WORD)
-            font = pango.FontDescription("Bitstream Vera Sans " +
+            self.text_view.set_wrap_mode(Gtk.WrapMode.WORD)
+            font = Pango.FontDescription("Bitstream Vera Sans " +
                                          str(style.FONT_SIZE))
         else:
             if hasattr(self.buffer, 'set_highlight'):
@@ -157,11 +140,11 @@ class EditActivity(sugar_tools.GroupActivity):
 
             self.text_view.set_show_line_numbers(True)
 
-            self.text_view.set_wrap_mode(gtk.WRAP_CHAR)
+            self.text_view.set_wrap_mode(Gtk.WrapMode.CHAR)
             self.text_view.set_insert_spaces_instead_of_tabs(True)
             self.text_view.set_tab_width(2)
             self.text_view.set_auto_indent(True)
-            font = pango.FontDescription("Monospace " +
+            font = Pango.FontDescription("Monospace " +
                                          str(style.FONT_SIZE))
 
         self.text_view.modify_font(font)
@@ -186,7 +169,7 @@ class EditActivity(sugar_tools.GroupActivity):
         fhandle = open(filename, "w")
 
         bounds = self.buffer.get_bounds()
-        text = self.buffer.get_text(bounds[0], bounds[1])
+        text = self.buffer.get_text(bounds[0], bounds[1], True)
 
         fhandle.write(text)
         fhandle.close()
@@ -224,8 +207,8 @@ class EditActivity(sugar_tools.GroupActivity):
             return None
 
     def when_shared(self):
-        self._edit_toolbar.undo.set_sensitive(False)
-        self._edit_toolbar.redo.set_sensitive(False)
+        self.edit_toolbar.undo.set_sensitive(False)
+        self.edit_toolbar.redo.set_sensitive(False)
 
     def undobutton_cb(self, button):
         if self.buffer.can_undo():
@@ -237,7 +220,7 @@ class EditActivity(sugar_tools.GroupActivity):
             self.buffer.redo()
 
     def copybutton_cb(self, button):
-        self.buffer.copy_clipboard(gtk.Clipboard())
+        self.buffer.copy_clipboard(Gtk.Clipboard())
 
     def pastebutton_cb(self, button):
-        self.buffer.paste_clipboard(gtk.Clipboard(), None, True)
+        self.buffer.paste_clipboard(Gtk.Clipboard(), None, True)
