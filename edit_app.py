@@ -18,21 +18,15 @@ from sugar3.graphics.toolbarbox import ToolbarButton
 
 from sugar3.graphics import style
 from sugar3.activity.widgets import EditToolbar
+from sugar3.activity import activity
+
+from collabwrapper.collabwrapper import CollabWrapper
+from collabwrapper.texteditor import TextBufferCollaberizer
 
 import mdnames
 
-from groupthink import sugar_tools, gtk_tools
 
-
-class EditActivity(sugar_tools.GroupActivity):
-    '''A text editor for Sugar
-    pylint says I need a docstring. Here you go.
-    '''
-
-    message_preparing = _("Loading...")
-    message_joining = _("Joining shared activity...")
-    message_loading = _("Reading journal entry...")
-
+class EditActivity(activity.Activity):
     def checkts(self):
         '''Check the timestamp
         If someone's modified our file in an external editor,
@@ -47,16 +41,23 @@ class EditActivity(sugar_tools.GroupActivity):
         '''We want to set up the buffer et al. early on
         sure there's early_setup, but that's not early enough
         '''
+        activity.Activity.__init__(self, handle)
+        self._collab = CollabWrapper(self)
 
         self.buffer = GtkSource.Buffer()
+        TextBufferCollaberizer(self.buffer, 'main', self._collab)
         self.refresh_buffer = False
 
         self.text_view = GtkSource.View.new_with_buffer(self.buffer)
         self.scrollwindow = Gtk.ScrolledWindow()
-
         self.scrollwindow.add(self.text_view)
 
-        sugar_tools.GroupActivity.__init__(self, handle)
+        self.setup_toolbar()
+
+        self.set_canvas(self.scrollwindow)
+        self.scrollwindow.show_all()
+        self._collab.setup()
+
 
     def fix_mimetype(self):
         '''We must have a mimetype. Sometimes, we don't (when we get launched
@@ -105,11 +106,6 @@ class EditActivity(sugar_tools.GroupActivity):
     def initialize_display(self):
         '''Set up GTK and friends'''
         self.fix_mimetype()
-
-        self.cloud.shared_buffer = gtk_tools.TextBufferSharePoint(self.buffer)
-
-        self.setup_toolbar()
-        #Some graphics code borrowed from Pippy
 
         lang_manager = GtkSource.LanguageManager.get_default()
         if hasattr(lang_manager, 'list_languages'):
@@ -160,11 +156,7 @@ class EditActivity(sugar_tools.GroupActivity):
         #Return the main widget. our parents take care of GTK stuff
         return self.scrollwindow
 
-    def save_to_journal(self, filename, cloudstring):
-        '''Saves to the journal.
-        We use metadata magic to keep the collab. stuff'''
-        self.metadata[mdnames.cloudstring_md] = cloudstring
-
+    def write_file(self, filename):
         #Also write to file:
         fhandle = open(filename, "w")
 
@@ -179,36 +171,12 @@ class EditActivity(sugar_tools.GroupActivity):
         #We can do full-text search on all Edit documents, yay
         self.metadata[mdnames.contents_md] = text
 
-        #If we edit the file in another way, we need to reload the contents
-        #we fudge the timestamp forwards by 5 seconds
-        #mmmm, fudge
-        self.metadata[mdnames.cloudtimestamp_md] = time.clock() + 5
-
-    def load_from_journal(self, filename):
+    def read_file(self, filename):
         '''Load the file. Duh.'''
+        text = open(filename, "r").read()  # yay hackish one-line read
 
-        if mdnames.cloudstring_md in self.metadata:
-            if self.checkts():
-                #if we were edited in another program
-                #we need to reload the text
-                #setting self.refresh_buffer makes us do that
-                text = open(filename, "r").read()  # yay hackish one-line read
-                self.refresh_buffer = text
-
-            #File has been saved with Edit, thus
-            #load the fancy collaboration data
-            #instead of just the text
-            return self.metadata[mdnames.cloudstring_md]
-
-        else:
-            text = open(filename, "r").read()  # yay hackish one-line read
-
-            self.buffer.set_text(text)
-            return None
-
-    def when_shared(self):
-        self.edit_toolbar.undo.set_sensitive(False)
-        self.edit_toolbar.redo.set_sensitive(False)
+        self.buffer.set_text(text)
+        return None
 
     def undobutton_cb(self, button):
         if self.buffer.can_undo():
